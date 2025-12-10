@@ -7,9 +7,9 @@
     
     <!-- ✅ PWA + ICON -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#020617">
+    <meta name="theme-color" content="#050505">
     <link rel="icon" type="image/png" href="icon-512.png">
-
+    
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -38,16 +38,21 @@
                         sans: ['Outfit', 'sans-serif'],
                     },
                     colors: {
-                        neon: {
-                            green: '#10b981',
-                            glow: 'rgba(16, 185, 129, 0.5)',
-                            dark: '#0f172a',
-                            panel: '#1e293b'
+                        premium: {
+                            bg: '#050505',
+                            card: '#0f0f11',
+                            gold: '#d4af37',
+                            emerald: '#10b981',
+                            accent: '#3b82f6',
+                            border: 'rgba(255, 255, 255, 0.08)'
                         }
                     },
                     boxShadow: {
-                        'neon': '0 0 15px rgba(16, 185, 129, 0.3)',
-                        'neon-hover': '0 0 25px rgba(16, 185, 129, 0.5)',
+                        'glow': '0 0 20px rgba(16, 185, 129, 0.15)',
+                        'glow-hover': '0 0 30px rgba(16, 185, 129, 0.3)',
+                    },
+                    backgroundImage: {
+                        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
                     }
                 }
             }
@@ -56,45 +61,58 @@
 
     <style>
         body {
-            background-color: #020617;
+            background-color: #050505;
             color: #e2e8f0;
-            -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+            -webkit-tap-highlight-color: transparent;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(16, 185, 129, 0.08), transparent 25%), 
+                radial-gradient(circle at 85% 30%, rgba(59, 130, 246, 0.08), transparent 25%);
+            background-attachment: fixed;
+            overflow-x: hidden; /* Prevent horizontal scroll */
         }
+        
         .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(20, 20, 23, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
         }
+
         .glass-input {
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(148, 163, 184, 0.1);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             color: white;
-            appearance: none; /* Remove default styling on iOS */
+            appearance: none;
+            transition: all 0.3s ease;
         }
+        
         .glass-input:focus {
+            background: rgba(255, 255, 255, 0.05);
             border-color: #10b981;
-            box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);
         }
+
         /* Custom date input styling */
         input[type="date"]::-webkit-calendar-picker-indicator,
         input[type="month"]::-webkit-calendar-picker-indicator {
             filter: invert(1);
+            opacity: 0.6;
             cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator:hover,
+        input[type="month"]::-webkit-calendar-picker-indicator:hover {
+            opacity: 1;
         }
         
-        /* Scrollbar styling */
-        ::-webkit-scrollbar {
-            width: 8px;
+        /* Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        ::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
+        .animate-fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
         }
     </style>
 </head>
@@ -131,6 +149,9 @@
             const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
             const [loadingPdf, setLoadingPdf] = useState(false);
             
+            // Edit Mode State
+            const [editingId, setEditingId] = useState(null);
+            
             // Dashboard Date State
             const [dashboardMonthStr, setDashboardMonthStr] = useState(new Date().toISOString().slice(0, 7)); // "YYYY-MM"
             const [downloadRange, setDownloadRange] = useState({ start: '', end: '' });
@@ -140,31 +161,22 @@
             const [showProfileModal, setShowProfileModal] = useState(false);
             const [tempProfile, setTempProfile] = useState({ name: 'User', logo: null });
 
-            // Modal State (For Custom Confirmations)
+            // Modal State
             const [confirmModal, setConfirmModal] = useState({ show: false, message: '', onConfirm: null, isDanger: false });
 
             // Form State
-            const [itemForm, setItemForm] = useState({ description: '', amount: '', category: '' });
+            const [itemForm, setItemForm] = useState({ description: '', amount: '' });
 
             // --- EFFECTS ---
             useEffect(() => {
-                // Check for Password
                 const storedPassword = localStorage.getItem('myAppPassword');
-                if (storedPassword) {
-                    setHasPassword(true);
-                } else {
-                    setHasPassword(false);
-                }
+                setHasPassword(!!storedPassword);
 
-                // Load Data
                 const savedData = localStorage.getItem('myExpenses');
-                if (savedData) {
-                    try { setExpenses(JSON.parse(savedData)); } catch(e) { console.error(e); }
-                }
+                if (savedData) try { setExpenses(JSON.parse(savedData)); } catch(e) { console.error(e); }
+                
                 const savedProfile = localStorage.getItem('myUserProfile');
-                if (savedProfile) {
-                    try { setProfile(JSON.parse(savedProfile)); } catch(e) { console.error(e); }
-                }
+                if (savedProfile) try { setProfile(JSON.parse(savedProfile)); } catch(e) { console.error(e); }
             }, []);
 
             useEffect(() => { localStorage.setItem('myExpenses', JSON.stringify(expenses)); }, [expenses]);
@@ -177,22 +189,22 @@
                 if (authInput === storedPassword) {
                     setIsAuthenticated(true);
                     setAuthError('');
+                    setAuthInput('');
                 } else {
                     setAuthError('Incorrect Password');
                     setAuthInput('');
                 }
             };
 
+            const handleLogout = () => {
+                setIsAuthenticated(false);
+                setView('home');
+            };
+
             const handleSetupPassword = (e) => {
                 e.preventDefault();
-                if (setupPassword.length < 4) {
-                    setAuthError('Password must be at least 4 characters');
-                    return;
-                }
-                if (setupPassword !== confirmPassword) {
-                    setAuthError('Passwords do not match');
-                    return;
-                }
+                if (setupPassword.length < 4) { setAuthError('Password must be at least 4 characters'); return; }
+                if (setupPassword !== confirmPassword) { setAuthError('Passwords do not match'); return; }
                 localStorage.setItem('myAppPassword', setupPassword);
                 setHasPassword(true);
                 setIsAuthenticated(true);
@@ -237,7 +249,6 @@
                 return groups;
             }, [dates, groupedExpenses]);
 
-            // Filtered Dashboard Total based on selected Month
             const dashboardTotal = useMemo(() => {
                 if(!dashboardMonthStr) return 0;
                 const [year, month] = dashboardMonthStr.split('-');
@@ -252,21 +263,58 @@
 
             // --- FORMATTING ---
             const formatRupees = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
-            const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+            
+            // DD/MM/YYYY Format
+            const formatDate = (dateStr) => {
+                const d = new Date(dateStr);
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const year = d.getFullYear();
+                return `${day}/${month}/${year}`;
+            };
+            
+            const formatDateLong = (dateStr) => {
+                const d = new Date(dateStr);
+                return d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+            }
 
             // --- APP ACTIONS ---
             const handleAddItem = (e) => {
                 e.preventDefault();
                 if (!itemForm.description || !itemForm.amount) return;
-                const newExpense = {
-                    id: Date.now(),
-                    description: itemForm.description,
-                    amount: parseFloat(itemForm.amount),
-                    category: itemForm.category, // Note
-                    date: selectedDate
-                };
-                setExpenses([newExpense, ...expenses]);
-                setItemForm({ description: '', amount: '', category: '' });
+
+                if (editingId) {
+                    // Update existing
+                    setExpenses(prev => prev.map(item => {
+                        if (item.id === editingId) {
+                            return { ...item, description: itemForm.description, amount: parseFloat(itemForm.amount) };
+                        }
+                        return item;
+                    }));
+                    setEditingId(null);
+                } else {
+                    // Add new
+                    const newExpense = {
+                        id: Date.now(),
+                        description: itemForm.description,
+                        amount: parseFloat(itemForm.amount),
+                        date: selectedDate
+                    };
+                    setExpenses([newExpense, ...expenses]);
+                }
+                setItemForm({ description: '', amount: '' });
+            };
+
+            const startEditing = (item) => {
+                setItemForm({ description: item.description, amount: item.amount });
+                setEditingId(item.id);
+                // Scroll to top to see form
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            const cancelEditing = () => {
+                setEditingId(null);
+                setItemForm({ description: '', amount: '' });
             };
 
             const triggerConfirm = (message, action, isDanger = false) => {
@@ -284,6 +332,7 @@
             const handleDeleteItem = (id) => {
                 triggerConfirm('Delete this expense entry?', () => {
                     setExpenses(prev => prev.filter(ex => ex.id !== id));
+                    if (editingId === id) cancelEditing();
                 });
             };
 
@@ -295,7 +344,7 @@
             };
 
             const handleClearAllData = () => {
-                triggerConfirm('WARNING: This will permanently delete ALL expense history. This cannot be undone.', () => {
+                triggerConfirm('WARNING: This will permanently delete ALL expense history.', () => {
                     setExpenses([]);
                     localStorage.removeItem('myExpenses');
                 }, true);
@@ -304,6 +353,7 @@
             const openDateBlock = (date) => {
                 setSelectedDate(date);
                 setView('detail');
+                cancelEditing(); // Ensure clean slate
             };
 
             // --- PROFILE ACTIONS ---
@@ -336,9 +386,6 @@
                 try {
                     const { jsPDF } = window.jspdf;
                     const doc = new jsPDF();
-                    const now = new Date();
-
-                    // Filter by date range
                     const start = new Date(downloadRange.start);
                     const end = new Date(downloadRange.end);
                     end.setHours(23, 59, 59);
@@ -351,41 +398,40 @@
                     filteredExpenses.sort((a, b) => new Date(b.date) - new Date(a.date));
                     const total = filteredExpenses.reduce((acc, curr) => acc + curr.amount, 0);
 
-                    doc.setFillColor(16, 185, 129);
+                    // Header
+                    doc.setFillColor(5, 5, 5); // Dark BG
                     doc.rect(0, 0, 210, 40, 'F');
                     
                     doc.setFontSize(22);
-                    doc.setTextColor(255, 255, 255);
-                    doc.text(`${profile.name}'s Statement`, 14, 25);
-                    
-                    doc.setFontSize(10);
-                    doc.setTextColor(236, 253, 245);
-                    doc.text(`From: ${start.toLocaleDateString('en-IN')}  To: ${end.toLocaleDateString('en-IN')}`, 14, 32);
+                    doc.setTextColor(16, 185, 129); // Emerald
+                    doc.text(`${profile.name}`, 14, 25);
+                    doc.setFontSize(12);
+                    doc.setTextColor(200, 200, 200);
+                    doc.text(`Expense Data`, 14, 32);
 
-                    doc.setFillColor(241, 245, 249);
-                    doc.rect(14, 45, 182, 20, 'F');
-                    
+                    // Range Info
                     doc.setFontSize(10);
                     doc.setTextColor(100);
-                    doc.text("Total Period Expenditure", 20, 52);
-                    doc.setFontSize(14);
-                    doc.setTextColor(16, 185, 129);
-                    doc.text(`Rs. ${total.toLocaleString('en-IN')}`, 20, 60);
+                    doc.text(`Period: ${formatDate(downloadRange.start)} to ${formatDate(downloadRange.end)}`, 14, 50);
 
-                    const tableColumn = ["Date", "Description", "Note", "Amount (INR)"];
+                    doc.setFontSize(14);
+                    doc.setTextColor(0);
+                    doc.text(`Total: Rs. ${total.toLocaleString('en-IN')}`, 14, 60);
+
+                    const tableColumn = ["Date", "Description", "Amount (INR)"];
                     const tableRows = filteredExpenses.map(ex => [
-                        ex.date,
+                        formatDate(ex.date),
                         ex.description,
-                        ex.category,
                         ex.amount.toLocaleString('en-IN')
                     ]);
 
                     doc.autoTable({
                         head: [tableColumn], body: tableRows, startY: 70, theme: 'grid',
-                        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] }
+                        headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255] },
+                        alternateRowStyles: { fillColor: [245, 245, 245] }
                     });
 
-                    doc.save(`Statement_${downloadRange.start}_to_${downloadRange.end}.pdf`);
+                    doc.save(`Expenses_${formatDate(downloadRange.start)}.pdf`);
                 } catch (error) {
                     console.error(error);
                     alert("PDF Error");
@@ -398,13 +444,13 @@
             const ConfirmModal = () => {
                 if (!confirmModal.show) return null;
                 return (
-                    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                        <div className="glass-panel w-full max-w-sm p-6 rounded-2xl shadow-2xl border border-slate-700">
+                    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
+                        <div className="glass-panel w-full max-w-sm p-6 rounded-2xl shadow-2xl border border-white/10">
                             <h3 className="text-xl font-bold text-white mb-2">Confirm Action</h3>
                             <p className="text-slate-300 mb-6">{confirmModal.message}</p>
                             <div className="flex gap-3">
-                                <button onClick={() => setConfirmModal({ ...confirmModal, show: false })} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 font-medium active:scale-95 transition-transform">Cancel</button>
-                                <button onClick={confirmModal.onConfirm} className={`flex-1 py-3 rounded-xl font-bold text-white shadow-lg active:scale-95 transition-transform ${confirmModal.isDanger ? 'bg-red-600 hover:bg-red-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>Confirm</button>
+                                <button onClick={() => setConfirmModal({ ...confirmModal, show: false })} className="flex-1 py-3 rounded-xl bg-white/5 text-slate-300 hover:bg-white/10 font-medium active:scale-95 transition-all">Cancel</button>
+                                <button onClick={confirmModal.onConfirm} className={`flex-1 py-3 rounded-xl font-bold text-white shadow-lg active:scale-95 transition-all ${confirmModal.isDanger ? 'bg-red-600/80 hover:bg-red-600' : 'bg-emerald-600/80 hover:bg-emerald-600'}`}>Confirm</button>
                             </div>
                         </div>
                     </div>
@@ -412,30 +458,35 @@
             };
 
             const ProfileModal = () => (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="glass-panel w-full max-w-md p-6 rounded-2xl shadow-2xl border border-emerald-500/30">
+                <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/90 backdrop-blur-md p-0 sm:p-4">
+                    {/* Added max-h and overflow-y-auto to fix keyboard issues on mobile */}
+                    <div className="glass-panel w-full max-w-md p-6 rounded-t-3xl sm:rounded-2xl shadow-2xl border border-white/10 max-h-[90vh] overflow-y-auto animate-fade-in">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-xl font-bold text-white">Edit Profile</h3>
-                            <button onClick={() => setShowProfileModal(false)} className="text-slate-400 hover:text-white p-2"><Icon name="x" size={24} /></button>
+                            <button onClick={() => setShowProfileModal(false)} className="text-slate-400 hover:text-white p-2 rounded-full hover:bg-white/10"><Icon name="x" size={24} /></button>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                             <div>
-                                <label className="block text-sm text-slate-400 mb-1">Your Name</label>
-                                <input type="text" value={tempProfile.name} onChange={(e) => setTempProfile({...tempProfile, name: e.target.value})} className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:border-emerald-500" placeholder="Enter your name" />
+                                <label className="block text-sm text-slate-400 mb-2 font-medium">Display Name</label>
+                                <input type="text" value={tempProfile.name} onChange={(e) => setTempProfile({...tempProfile, name: e.target.value})} className="w-full px-4 py-3.5 rounded-xl glass-input outline-none focus:border-emerald-500 font-medium" placeholder="Enter your name" />
                             </div>
                             <div>
-                                <label className="block text-sm text-slate-400 mb-1">Profile Picture</label>
+                                <label className="block text-sm text-slate-400 mb-2 font-medium">Avatar</label>
                                 <div className="flex items-center gap-4">
-                                    <div className="w-16 h-16 rounded-full bg-slate-800 border-2 border-slate-700 overflow-hidden flex items-center justify-center shrink-0">
+                                    <div className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 overflow-hidden flex items-center justify-center shrink-0 shadow-lg">
                                         {tempProfile.logo ? <img src={tempProfile.logo} className="w-full h-full object-cover" /> : <Icon name="user" className="text-emerald-500" size={32} />}
                                     </div>
-                                    <label className="cursor-pointer px-6 py-3 bg-slate-800 hover:bg-slate-700 text-sm font-medium rounded-xl text-white transition-colors border border-slate-700 flex-1 text-center active:scale-95">
-                                        Upload
+                                    <label className="cursor-pointer flex-1 h-20 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 border-dashed rounded-2xl text-sm font-medium text-slate-300 transition-all active:scale-95">
+                                        <div className="flex flex-col items-center gap-1">
+                                            <Icon name="upload-cloud" size={20} className="text-emerald-500" />
+                                            <span>Upload Image</span>
+                                        </div>
                                         <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
                                     </label>
                                 </div>
                             </div>
-                            <button onClick={saveProfile} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-neon mt-4 active:scale-95 transition-transform">Save Profile</button>
+                            <button onClick={saveProfile} className="w-full py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-bold shadow-glow hover:shadow-glow-hover active:scale-95 transition-all mt-4">Save Changes</button>
+                            <div className="h-4 sm:h-0"></div> {/* Spacing for mobile bottom */}
                         </div>
                     </div>
                 </div>
@@ -444,37 +495,41 @@
             // --- MAIN AUTH CHECK ---
             if (!isAuthenticated) {
                 return (
-                    <div className="min-h-screen font-sans flex items-center justify-center p-4 selection:bg-emerald-500 selection:text-white">
-                        <div className="glass-panel w-full max-w-md p-8 rounded-3xl shadow-2xl border border-emerald-500/20 text-center relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                            
-                            <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6 border border-slate-700 shadow-neon">
-                                <Icon name={hasPassword ? "lock" : "shield-check"} className="text-emerald-400" size={32} />
+                    <div className="min-h-screen font-sans flex items-center justify-center p-6 selection:bg-emerald-500 selection:text-white relative overflow-hidden">
+                        {/* Background Blobs */}
+                        <div className="absolute top-0 left-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-[100px] -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+                        <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] translate-x-1/2 translate-y-1/2 pointer-events-none"></div>
+
+                        <div className="glass-panel w-full max-w-sm p-8 rounded-3xl shadow-2xl border border-white/10 text-center relative z-10 animate-fade-in">
+                            <div className="w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-white/10 shadow-lg rotate-3 hover:rotate-0 transition-transform duration-500">
+                                <Icon name={hasPassword ? "lock" : "shield-check"} className="text-emerald-400" size={36} />
                             </div>
 
-                            <h1 className="text-2xl font-bold text-white mb-2">{hasPassword ? `Welcome Back, ${profile.name}` : "Secure Your Expenses"}</h1>
-                            <p className="text-slate-400 text-sm mb-8">{hasPassword ? "Enter your password to unlock" : "Set a password to protect your data"}</p>
+                            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2 tracking-tight">{hasPassword ? `Welcome Back` : "Secure Entry"}</h1>
+                            <p className="text-slate-400 text-sm mb-8 font-light">{hasPassword ? `Enter password for ${profile.name}` : "Set a master password to continue"}</p>
 
                             {hasPassword ? (
                                 <form onSubmit={handleLogin} className="space-y-4">
-                                    <input 
-                                        type="password" 
-                                        placeholder="Enter Password" 
-                                        className="w-full px-5 py-3 rounded-xl glass-input outline-none transition-all text-center tracking-widest text-lg" 
-                                        value={authInput} 
-                                        onChange={e => setAuthInput(e.target.value)}
-                                        autoFocus
-                                    />
-                                    {authError && <p className="text-red-400 text-sm">{authError}</p>}
-                                    <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-neon transition-all active:scale-95">Unlock</button>
-                                    <button type="button" onClick={handleFactoryReset} className="text-xs text-slate-600 hover:text-red-400 mt-4 underline decoration-slate-700 hover:decoration-red-400 transition-all p-2">Forgot Password? (Reset App)</button>
+                                    <div className="relative">
+                                        <input 
+                                            type="password" 
+                                            placeholder="••••" 
+                                            className="w-full px-5 py-4 rounded-xl glass-input outline-none transition-all text-center tracking-[0.5em] text-xl font-bold placeholder:text-slate-600 placeholder:tracking-normal placeholder:font-normal" 
+                                            value={authInput} 
+                                            onChange={e => setAuthInput(e.target.value)}
+                                            autoFocus
+                                        />
+                                    </div>
+                                    {authError && <p className="text-red-400 text-sm bg-red-500/10 py-2 rounded-lg border border-red-500/20">{authError}</p>}
+                                    <button type="submit" className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white rounded-xl font-bold shadow-glow transition-all active:scale-95 text-lg">Access Data</button>
+                                    <button type="button" onClick={handleFactoryReset} className="text-xs text-slate-500 hover:text-red-400 mt-6 transition-colors">Forgot Password? (Reset All Data)</button>
                                 </form>
                             ) : (
                                 <form onSubmit={handleSetupPassword} className="space-y-4">
-                                    <input type="password" placeholder="Create Password" className="w-full px-5 py-3 rounded-xl glass-input outline-none transition-all text-center tracking-widest" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} autoFocus />
-                                    <input type="password" placeholder="Confirm Password" className="w-full px-5 py-3 rounded-xl glass-input outline-none transition-all text-center tracking-widest" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
-                                    {authError && <p className="text-red-400 text-sm">{authError}</p>}
-                                    <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-neon transition-all active:scale-95">Set Password</button>
+                                    <input type="password" placeholder="Create Password" className="w-full px-5 py-4 rounded-xl glass-input outline-none transition-all text-center tracking-widest text-lg" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} autoFocus />
+                                    <input type="password" placeholder="Confirm Password" className="w-full px-5 py-4 rounded-xl glass-input outline-none transition-all text-center tracking-widest text-lg" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+                                    {authError && <p className="text-red-400 text-sm bg-red-500/10 py-2 rounded-lg border border-red-500/20">{authError}</p>}
+                                    <button type="submit" className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-xl font-bold shadow-glow transition-all active:scale-95 text-lg">Set Password</button>
                                 </form>
                             )}
                         </div>
@@ -490,55 +545,76 @@
                 return (
                     <div className="min-h-screen font-sans pb-12 selection:bg-emerald-500 selection:text-white">
                         <ConfirmModal />
-                        <div className="bg-slate-900 border-b border-slate-800 p-4 md:p-6 sticky top-0 z-50 backdrop-blur-md bg-opacity-90">
+                        <div className="bg-black/40 border-b border-white/5 p-4 sticky top-0 z-40 backdrop-blur-xl">
                             <div className="max-w-3xl mx-auto">
-                                <button onClick={() => setView('home')} className="flex items-center gap-2 text-slate-400 hover:text-emerald-400 transition-colors mb-4 text-sm font-medium group py-2">
-                                    <Icon name="arrow-left" size={16} /> <span className="group-hover:translate-x-1 transition-transform">Back to Dashboard</span>
+                                <button onClick={() => { setView('home'); cancelEditing(); }} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-4 text-sm font-medium group py-1">
+                                    <div className="bg-white/5 p-1.5 rounded-lg group-hover:bg-white/10 transition-colors"><Icon name="arrow-left" size={16} /></div>
+                                    <span>Dashboard</span>
                                 </button>
                                 <div className="flex justify-between items-end">
                                     <div>
                                         <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight flex items-center gap-3">{formatDate(selectedDate)}</h2>
-                                        <p className="text-slate-400 mt-1 text-sm md:text-base">Daily Breakdown</p>
+                                        <p className="text-slate-400 text-sm mt-1 font-light">{formatDateLong(selectedDate)}</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-emerald-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-1">Total Spent</p>
-                                        <p className="text-2xl md:text-3xl font-bold text-white shadow-emerald-500/20 drop-shadow-lg">{formatRupees(dailyTotal)}</p>
+                                        <p className="text-emerald-500 text-[10px] font-bold uppercase tracking-widest mb-1">Total Spent</p>
+                                        <p className="text-xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">{formatRupees(dailyTotal)}</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="max-w-3xl mx-auto px-4 mt-6 md:mt-8 space-y-6">
-                            <div className="glass-panel rounded-2xl p-4 md:p-6 shadow-neon">
-                                <h3 className="text-lg font-semibold text-emerald-400 mb-4 flex items-center gap-2"><Icon name="plus-circle" /> Add New Expense</h3>
-                                <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4">
-                                    <div className="md:col-span-5"><input type="text" placeholder="Description" className="w-full px-4 py-3 rounded-xl glass-input outline-none transition-all" value={itemForm.description} onChange={e => setItemForm({...itemForm, description: e.target.value})} /></div>
-                                    <div className="md:col-span-3">
-                                        <input type="text" placeholder="Note" className="w-full px-4 py-3 rounded-xl glass-input outline-none transition-all" value={itemForm.category} onChange={e => setItemForm({...itemForm, category: e.target.value})} />
+                        <div className="max-w-3xl mx-auto px-4 mt-6 space-y-6">
+                            <div className={`glass-panel rounded-3xl p-6 transition-all duration-300 ${editingId ? 'border-emerald-500/30 ring-1 ring-emerald-500/20' : 'border-white/5'}`}>
+                                <h3 className={`text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2 ${editingId ? 'text-emerald-400' : 'text-slate-400'}`}>
+                                    {editingId ? <><Icon name="edit-3" size={16} /> Edit Expense</> : <><Icon name="plus" size={16} /> Add Expense</>}
+                                </h3>
+                                <form onSubmit={handleAddItem} className="flex flex-col md:flex-row gap-3">
+                                    <div className="flex-grow">
+                                        <input type="text" placeholder="Description" className="w-full h-14 px-5 rounded-xl glass-input outline-none font-medium placeholder:text-slate-600" value={itemForm.description} onChange={e => setItemForm({...itemForm, description: e.target.value})} />
                                     </div>
-                                    <div className="md:col-span-3 relative"><div className="absolute left-3 top-3.5 text-slate-400"><Icon name="indian-rupee" size={16} /></div><input type="number" placeholder="0.00" step="0.01" className="w-full pl-9 pr-4 py-3 rounded-xl glass-input outline-none transition-all" value={itemForm.amount} onChange={e => setItemForm({...itemForm, amount: e.target.value})} /></div>
-                                    <div className="md:col-span-1"><button type="submit" className="w-full h-12 md:h-full bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-xl flex items-center justify-center transition-all shadow-neon hover:shadow-neon-hover font-bold active:scale-95"><Icon name="plus" /></button></div>
+                                    <div className="relative w-full md:w-40">
+                                        <div className="absolute left-4 top-4 text-slate-500"><Icon name="indian-rupee" size={18} /></div>
+                                        <input type="number" placeholder="0" step="0.01" className="w-full h-14 pl-10 pr-4 rounded-xl glass-input outline-none font-medium placeholder:text-slate-600" value={itemForm.amount} onChange={e => setItemForm({...itemForm, amount: e.target.value})} />
+                                    </div>
+                                    <div className="flex gap-2 h-14">
+                                        {editingId && (
+                                            <button type="button" onClick={cancelEditing} className="h-full px-4 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl flex items-center justify-center transition-all border border-white/5">
+                                                <Icon name="x" size={20} />
+                                            </button>
+                                        )}
+                                        <button type="submit" className={`h-full px-6 ${editingId ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-white text-black hover:bg-slate-200'} rounded-xl flex items-center justify-center transition-all font-bold shadow-lg active:scale-95`}>
+                                            {editingId ? 'Update' : 'Add'}
+                                        </button>
+                                    </div>
                                 </form>
                             </div>
 
-                            <div className="glass-panel rounded-2xl overflow-hidden pb-4 md:pb-0">
+                            <div className="pb-10">
                                 {dailyExpenses.length === 0 ? (
-                                    <div className="p-12 text-center text-slate-500 flex flex-col items-center gap-3"><Icon name="receipt" size={48} className="opacity-20" /><p>No transactions recorded.</p></div>
+                                    <div className="p-16 text-center text-slate-600 flex flex-col items-center gap-4 border border-dashed border-white/5 rounded-3xl">
+                                        <div className="p-4 bg-white/5 rounded-full"><Icon name="receipt" size={32} className="opacity-50" /></div>
+                                        <p className="font-light">No transactions recorded today.</p>
+                                    </div>
                                 ) : (
-                                    <div className="divide-y divide-slate-800">
+                                    <div className="space-y-3">
                                         {dailyExpenses.map(ex => (
-                                            <div key={ex.id} className="p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between hover:bg-slate-800/50 transition-colors group gap-3 md:gap-0">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-emerald-500 border border-slate-700 shrink-0"><Icon name="tag" size={18} /></div>
-                                                    <div>
-                                                        <p className="font-medium text-slate-200 line-clamp-1">{ex.description}</p>
-                                                        {ex.category && <p className="text-xs text-slate-500">{ex.category}</p>}
+                                            <div key={ex.id} className={`p-4 md:p-5 rounded-2xl border transition-all group flex flex-col md:flex-row md:items-center justify-between gap-3 ${editingId === ex.id ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'}`}>
+                                                <div className="flex items-center gap-4 min-w-0 flex-1">
+                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shrink-0 ${editingId === ex.id ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-black/40 border-white/10 text-slate-400'}`}>
+                                                        <Icon name="shopping-bag" size={20} />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="font-semibold text-white text-base md:text-lg break-words">{ex.description}</p>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center justify-between md:justify-end gap-4 pl-14 md:pl-0">
-                                                    <span className="font-bold text-white tracking-wide">{formatRupees(ex.amount)}</span>
-                                                    {/* Opacity removed on mobile (always visible), hidden logic applied only to desktop via md: */}
-                                                    <button onClick={() => handleDeleteItem(ex.id)} className="text-slate-600 hover:text-red-500 transition-colors p-2 md:opacity-0 md:group-hover:opacity-100"><Icon name="trash-2" size={18} /></button>
+                                                {/* Adjusted padding: removed pl-16 on mobile, aligned via justify-between */}
+                                                <div className="flex flex-wrap items-center justify-between md:justify-end gap-x-6 gap-y-2 w-full md:w-auto pl-0 md:pl-0">
+                                                    <span className="font-bold text-white text-lg md:text-xl tracking-tight">{formatRupees(ex.amount)}</span>
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        <button onClick={() => startEditing(ex)} className="p-2 text-slate-500 hover:text-white hover:bg-white/10 rounded-lg transition-all"><Icon name="pencil" size={18} /></button>
+                                                        <button onClick={() => handleDeleteItem(ex.id)} className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Icon name="trash-2" size={18} /></button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
@@ -556,106 +632,114 @@
                     {showProfileModal && <ProfileModal />}
                     <ConfirmModal />
                     
-                    <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
+                    <div className="max-w-4xl mx-auto space-y-6 md:space-y-8 animate-fade-in">
                         {/* Header Card */}
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end glass-panel p-6 md:p-8 rounded-3xl relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
+                        <div className="glass-panel p-6 md:p-8 rounded-[2rem] relative overflow-hidden group">
+                            {/* Decorative Background Elements */}
+                            <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-emerald-500/10 to-blue-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+                            <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none"></div>
                             
-                            <button onClick={openProfileModal} className="absolute top-4 right-4 md:top-6 md:right-6 p-2 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700 rounded-lg transition-all z-20"><Icon name="settings" size={20} /></button>
-
-                            <div className="relative z-10 w-full md:w-auto">
-                                <div className="flex items-center gap-4 mb-4">
-                                    <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shadow-lg shrink-0">
-                                        {profile.logo ? <img src={profile.logo} className="w-full h-full object-cover" /> : <Icon name="user" className="text-emerald-400" size={24} />}
+                            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
+                                <div className="flex items-center gap-5">
+                                    <div className="w-16 h-16 md:w-20 md:h-20 rounded-[1.2rem] bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl shrink-0 backdrop-blur-md">
+                                        {profile.logo ? <img src={profile.logo} className="w-full h-full object-cover" /> : <Icon name="user" className="text-emerald-400" size={32} />}
                                     </div>
-                                    <div className="pr-8">
-                                        <h1 className="text-2xl md:text-4xl font-bold text-white tracking-tight truncate max-w-[200px] md:max-w-none">{profile.name}</h1>
-                                        <p className="text-slate-400 text-xs md:text-sm">Expense Tracker</p>
+                                    <div className="pt-1 min-w-0">
+                                        <h1 className="text-2xl md:text-4xl font-bold text-white tracking-tight mb-1 truncate">{profile.name}</h1>
+                                        <p className="text-slate-400 text-sm font-medium tracking-wide">Expense Data Manager</p>
                                     </div>
                                 </div>
-                                <div className="mt-2 p-3 md:p-4 bg-slate-800/50 rounded-xl border border-slate-700 inline-block w-full md:w-auto">
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                                        <span className="text-xs md:text-sm text-slate-400">Total Expense For:</span>
+
+                                <div className="w-full md:w-auto bg-black/20 backdrop-blur-sm p-4 rounded-2xl border border-white/5">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                        <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">Month Total</span>
                                         <input 
                                             type="month" 
                                             value={dashboardMonthStr} 
                                             onChange={(e) => setDashboardMonthStr(e.target.value)}
-                                            className="bg-slate-900 border border-slate-600 text-white text-xs md:text-sm rounded-lg px-2 py-1 outline-none focus:border-emerald-500 w-full sm:w-auto"
+                                            className="bg-white/5 border border-white/10 text-white text-xs rounded-lg px-2 py-1 outline-none focus:border-emerald-500 w-full sm:w-auto"
                                         />
                                     </div>
-                                    <div className="mt-2 text-2xl md:text-3xl font-bold text-emerald-400">{formatRupees(dashboardTotal)}</div>
+                                    <div className="mt-2 text-3xl md:text-4xl font-bold text-emerald-400">{formatRupees(dashboardTotal)}</div>
                                 </div>
                             </div>
 
-                            {/* Date Range & Download */}
-                            <div className="mt-6 md:mt-0 relative z-10 w-full md:w-auto flex flex-col gap-3">
-                                <p className="text-[10px] md:text-xs text-slate-500 font-bold uppercase tracking-wider">Download Statement</p>
-                                <div className="flex gap-2">
-                                    <div className="flex-1">
-                                        <label className="text-[10px] text-slate-400 block mb-1">From</label>
-                                        <input type="date" value={downloadRange.start} onChange={e => setDownloadRange({...downloadRange, start: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-emerald-500" />
+                            {/* Download Section */}
+                            <div className="mt-8 pt-6 border-t border-white/5">
+                                <div className="flex flex-col md:flex-row gap-4 items-end">
+                                    <div className="flex gap-3 w-full">
+                                        <div className="flex-1">
+                                            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2 block">Start Date</label>
+                                            <input type="date" value={downloadRange.start} onChange={e => setDownloadRange({...downloadRange, start: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-emerald-500 focus:bg-white/10 transition-all" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2 block">End Date</label>
+                                            <input type="date" value={downloadRange.end} onChange={e => setDownloadRange({...downloadRange, end: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-emerald-500 focus:bg-white/10 transition-all" />
+                                        </div>
                                     </div>
-                                    <div className="flex-1">
-                                        <label className="text-[10px] text-slate-400 block mb-1">To</label>
-                                        <input type="date" value={downloadRange.end} onChange={e => setDownloadRange({...downloadRange, end: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-emerald-500" />
-                                    </div>
+                                    <button onClick={generatePDF} disabled={loadingPdf} className="w-full md:w-auto px-6 py-2.5 bg-white text-black hover:bg-emerald-400 hover:text-black rounded-xl text-sm font-bold shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 whitespace-nowrap h-[42px]">
+                                        {loadingPdf ? 'Processing...' : <><Icon name="download" size={16} /> Export PDF</>}
+                                    </button>
                                 </div>
-                                <button onClick={generatePDF} disabled={loadingPdf} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-bold shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95">
-                                    {loadingPdf ? 'Generating...' : <><Icon name="file-down" size={16} /> Download PDF</>}
-                                </button>
                             </div>
                         </div>
 
                         {/* Date Selector */}
-                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 md:p-5 glass-panel rounded-2xl border border-slate-800">
-                            <div className="flex items-center gap-3 w-full md:w-auto">
-                                <div className="bg-slate-800 p-2.5 rounded-xl text-emerald-400 border border-slate-700 shrink-0"><Icon name="calendar-plus" size={24} /></div>
-                                <div><h3 className="font-bold text-white text-sm md:text-base">Manage Date</h3><p className="text-xs text-slate-400">Select or add a new day</p></div>
+                        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 p-5 glass-panel rounded-[1.5rem] border border-white/5">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-emerald-500/10 p-3 rounded-2xl text-emerald-400 border border-emerald-500/20 shrink-0"><Icon name="calendar" size={24} /></div>
+                                <div><h3 className="font-bold text-white text-lg">Select Date</h3></div>
                             </div>
-                            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                                <input type="date" className="w-full sm:w-auto px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-emerald-500 outline-none transition-colors" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
-                                <button onClick={() => setView('detail')} className="w-full sm:w-auto px-8 py-3 bg-slate-100 text-slate-900 hover:bg-white rounded-xl font-bold transition-all shadow-lg whitespace-nowrap active:scale-95">Open</button>
+                            <div className="flex flex-col sm:flex-row items-center gap-3">
+                                <input type="date" className="w-full sm:w-auto px-5 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white focus:border-emerald-500 outline-none transition-colors font-medium" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+                                <button onClick={() => { setView('detail'); cancelEditing(); }} className="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-500 text-white hover:from-emerald-500 hover:to-teal-400 rounded-xl font-bold transition-all shadow-glow active:scale-95 whitespace-nowrap">Open Details</button>
                             </div>
                         </div>
 
-                        {/* History */}
+                        {/* Expense List */}
                         <div className="space-y-6">
-                            <h2 className="text-lg font-bold text-slate-400 flex items-center gap-2"><Icon name="history" size={20} /> History</h2>
+                            <div className="flex items-center gap-3 px-2">
+                                <div className="p-1.5 bg-white/10 rounded-lg"><Icon name="list" size={16} className="text-white" /></div>
+                                <h2 className="text-lg font-bold text-white tracking-wide">Expense List</h2>
+                            </div>
+                            
                             {datesByMonth.length === 0 ? (
-                                <div className="text-center py-20 glass-panel rounded-3xl border-dashed border-2 border-slate-800">
-                                    <Icon name="layers" size={48} className="mx-auto text-slate-700 mb-4" />
-                                    <p className="text-slate-500">No records found. Start adding expenses!</p>
+                                <div className="text-center py-20 rounded-[2rem] border-2 border-dashed border-white/5 bg-white/[0.02]">
+                                    <Icon name="clipboard-list" size={48} className="mx-auto text-slate-700 mb-4" />
+                                    <p className="text-slate-500 font-light">No records found. Start adding expenses!</p>
                                 </div>
                             ) : (
-                                <div>
+                                <div className="space-y-8">
                                     {datesByMonth.map(group => (
-                                        <div key={group.title} className="mb-6 md:mb-8">
-                                            <div className="flex items-center gap-3 mb-4 pl-2">
-                                                <div className="h-px bg-slate-800 flex-1"></div>
-                                                <h3 className="text-emerald-500 font-bold text-xs md:text-sm uppercase tracking-widest whitespace-nowrap flex items-center gap-2">
-                                                    {group.title} <span className="text-slate-400 font-normal normal-case tracking-normal">(Total: {formatRupees(group.total)})</span>
+                                        <div key={group.title} className="animate-fade-in">
+                                            <div className="flex items-center gap-4 mb-4 pl-2">
+                                                <h3 className="text-emerald-500 font-bold text-xs uppercase tracking-[0.15em] bg-emerald-900/10 px-3 py-1 rounded-full border border-emerald-500/10">
+                                                    {group.title}
                                                 </h3>
-                                                <div className="h-px bg-slate-800 flex-1"></div>
+                                                <div className="h-px bg-white/10 flex-1"></div>
+                                                <span className="text-emerald-400 font-bold text-base md:text-lg">{formatRupees(group.total)}</span>
                                             </div>
-                                            <div className="space-y-3">
+                                            <div className="grid gap-3">
                                                 {group.dates.map(date => {
                                                     const dayTotal = groupedExpenses[date].reduce((acc, c) => acc + c.amount, 0);
                                                     const count = groupedExpenses[date].length;
                                                     return (
-                                                        <div key={date} onClick={() => openDateBlock(date)} className="glass-panel p-4 rounded-xl cursor-pointer group hover:bg-slate-800 transition-all border-l-4 border-l-slate-700 hover:border-l-emerald-500 flex items-center justify-between active:bg-slate-800/50">
-                                                            <div className="flex items-center gap-4 md:gap-6">
-                                                                <div className="text-center w-12 md:w-16">
-                                                                    <span className="block text-xl md:text-2xl font-bold text-white leading-none mt-1">{new Date(date).toLocaleDateString('en-IN', { day: 'numeric' })}</span>
-                                                                    <span className="block text-[10px] md:text-xs text-slate-500 mt-1 uppercase">{new Date(date).toLocaleDateString('en-IN', { weekday: 'short' })}</span>
+                                                        <div key={date} onClick={() => openDateBlock(date)} className="glass-panel p-4 rounded-2xl cursor-pointer group hover:bg-white/5 transition-all border border-white/5 hover:border-emerald-500/30 flex items-center justify-between active:scale-[0.99]">
+                                                            <div className="flex items-center gap-5">
+                                                                <div className="text-center w-14 bg-white/5 rounded-xl py-2 border border-white/5 group-hover:border-emerald-500/20 transition-colors">
+                                                                    <span className="block text-xl font-bold text-white leading-none">{new Date(date).getDate()}</span>
+                                                                    <span className="block text-[10px] text-slate-400 mt-1 uppercase font-bold">{new Date(date).toLocaleDateString('en-IN', { weekday: 'short' })}</span>
                                                                 </div>
-                                                                <div className="h-10 w-px bg-slate-700 hidden sm:block"></div>
-                                                                <div><p className="text-xs md:text-sm text-slate-400 flex items-center gap-2"><Icon name="list" size={14} /> {count} {count === 1 ? 'Txn' : 'Txns'}</p></div>
+                                                                <div>
+                                                                    <p className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{count} {count === 1 ? 'Entry' : 'Entries'}</p>
+                                                                    <p className="text-xs text-slate-500">Tap to view</p>
+                                                                </div>
                                                             </div>
-                                                            <div className="flex items-center gap-3 md:gap-4">
-                                                                <div className="text-right"><span className="block text-base md:text-lg font-bold text-white group-hover:text-emerald-400 transition-colors">{formatRupees(dayTotal)}</span></div>
-                                                                {/* Mobile compatible delete: always visible on mobile, hover only on desktop */}
-                                                                <button onClick={(e) => handleDeleteDateBlock(date, e)} className="p-2 text-slate-600 hover:text-red-500 hover:bg-slate-700 rounded-lg transition-colors z-20"><Icon name="trash-2" size={18} /></button>
-                                                                <div className="text-slate-500 group-hover:text-emerald-500 transition-all hidden md:block"><Icon name="chevron-right" size={20} /></div>
+                                                            <div className="flex items-center gap-4">
+                                                                <span className="block text-lg font-bold text-white group-hover:text-emerald-400 transition-colors">{formatRupees(dayTotal)}</span>
+                                                                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-slate-500 group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                                                                    <Icon name="chevron-right" size={16} />
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     );
@@ -667,10 +751,31 @@
                             )}
                         </div>
 
-                        <div className="pt-8 border-t border-slate-800 pb-8">
-                             <div className="glass-panel p-4 rounded-xl border border-red-900/30 flex flex-col sm:flex-row items-start sm:items-center justify-between bg-red-900/5 gap-4">
-                                <div><h4 className="text-red-400 font-bold text-sm">Remove All Data</h4><p className="text-xs text-slate-500">Permanently delete all expense history.</p></div>
-                                <button onClick={handleClearAllData} className="w-full sm:w-auto px-4 py-3 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg text-sm font-semibold transition-all border border-red-500/20 active:scale-95">Clear All Data</button>
+                        {/* App Settings Panel */}
+                        <div className="glass-panel p-5 rounded-[1.5rem] border border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                            <div className="flex items-center gap-4 w-full sm:w-auto">
+                                <div className="bg-white/5 p-3 rounded-2xl text-slate-400 border border-white/10"><Icon name="sliders" size={24} /></div>
+                                <div><h3 className="font-bold text-white text-lg">App Settings</h3><p className="text-xs text-slate-400">Profile & Session</p></div>
+                            </div>
+                            <div className="flex gap-3 w-full sm:w-auto">
+                                <button onClick={openProfileModal} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-all border border-white/10 active:scale-95">
+                                    <Icon name="settings" size={18} /> <span>Profile</span>
+                                </button>
+                                <button onClick={handleLogout} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-200 rounded-xl font-bold transition-all border border-red-500/10 active:scale-95">
+                                     <Icon name="power" size={18} /> <span>Logout</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="pt-2 pb-10">
+                             <div className="p-1 rounded-2xl bg-gradient-to-r from-red-900/20 to-transparent border border-red-900/30">
+                                <div className="p-5 rounded-xl bg-black/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="bg-red-500/10 p-3 rounded-full text-red-500"><Icon name="alert-triangle" size={24} /></div>
+                                        <div><h4 className="text-red-400 font-bold">Remove All the Data</h4><p className="text-xs text-slate-500">Permanently delete all data.</p></div>
+                                    </div>
+                                    <button onClick={handleClearAllData} className="w-full sm:w-auto px-6 py-3 bg-red-500/10 text-red-400 hover:bg-red-600 hover:text-white rounded-xl text-sm font-bold transition-all border border-red-500/20 active:scale-95">Reset Everything</button>
+                                </div>
                              </div>
                         </div>
                     </div>
